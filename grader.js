@@ -24,8 +24,11 @@ References:
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
+var rest = require('restler');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
+var URL_DEFAULT = "";
+var OUTPUT_FILE = "hw3-3.txt";
 
 var assertFileExists = function(infile) {
     var instr = infile.toString();
@@ -37,7 +40,11 @@ var assertFileExists = function(infile) {
 };
 
 var cheerioHtmlFile = function(htmlfile) {
-    return cheerio.load(fs.readFileSync(htmlfile));
+    if(fs.existsSync(htmlfile)){
+	return cheerio.load(fs.readFileSync(htmlfile));
+    }else{
+	return cheerio.load(htmlfile);
+    }
 };
 
 var loadChecks = function(checksfile) {
@@ -55,6 +62,11 @@ var checkHtmlFile = function(htmlfile, checksfile) {
     return out;
 };
 
+var processURLResponse = function(data, checksfile){
+    var result = checkHtmlFile(data, checksfile);
+    return result;
+};
+
 var clone = function(fn) {
     // Workaround for commander.js issue.
     // http://stackoverflow.com/a/6772648
@@ -65,10 +77,29 @@ if(require.main == module) {
     program
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
+        .option('-u, --url <url string>', 'URL', URL_DEFAULT)
         .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+
+    var fileURL = program.url;
+    if(fileURL.length > 0){
+	rest.get(fileURL).on('complete', function(response){
+	   var checkJson = processURLResponse(response, program.checks);
+	   var outJson = JSON.stringify(checkJson, null, 4);
+	   fs.writeFileSync(OUTPUT_FILE, outJson);
+	   console.log(outJson);
+	});
+    }else{
+	var checkJson = checkHtmlFile(program.file, program.checks);
+	var outJson = JSON.stringify(checkJson, null, 4);
+	console.log(outJson);
+	fs.writeFileSync(OUTPUT_FILE, outJson);
+    }
+
+    //var checkJson = checkHtmlFile(program.file, program.checks);
+    //var outJson = JSON.stringify(checkJson, null, 4);
+    //console.log(outJson);
+    //console.log(program.url.length);
+    //console.log(program.file.length);
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
